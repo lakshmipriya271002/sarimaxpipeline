@@ -6,14 +6,14 @@ metadata:
     scenarios.ai.sap.com/description: "Time series forecasting serving API with SARIMAX"
     scenarios.ai.sap.com/name: "Time Series Forecasting API"
     executables.ai.sap.com/description: "REST API for time series predictions using trained SARIMAX models"
-    executables.ai.sap.com/name: "SARIMAX Serving API"
+    executables.ai.sap.com/name: "sarimax-serving-api"
   labels:
     scenarios.ai.sap.com/id: "time-series-forecasting"
     ai.sap.com/version: "1.0"
 spec:
   inputs:
     parameters:
-    - name: model-name
+    - name: model_name
       default: "sarimax_initial_18months.pkl"
       type: string
       description: "Name of the trained SARIMAX model file to use for predictions"
@@ -44,7 +44,7 @@ spec:
               - name: MODEL_DIR
                 value: "/app/models/"
               - name: MODEL_NAME
-                value: "{{inputs.parameters.model-name}}"
+                value: "{{inputs.parameters.model_name}}"
               - name: PYTHONUNBUFFERED
                 value: "1"
             command: ["/bin/sh", "-c"]
