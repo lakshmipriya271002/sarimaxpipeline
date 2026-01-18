@@ -1,5 +1,5 @@
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
+apiVersion: ai.sap.com/v1alpha1
+kind: ServingTemplate
 metadata:
   name: timeseries-serving-pipeline # executable id, must be unique
   annotations:
@@ -10,66 +10,57 @@ metadata:
   labels:
     scenarios.ai.sap.com/id: "time-series-forecasting"
     ai.sap.com/version: "1.0"
-    executables.ai.sap.com/category: "serving"
 spec:
-  imagePullSecrets:
-    - name: sarimaxpipelinesecret # Docker registry secret for priyaannamalai
-  entrypoint: serving-pipeline
-  arguments:
+  inputs:
     parameters:
     - name: model-name
-      value: "sarimax_initial_18months.pkl"
-  
-  templates:
-  - name: serving-pipeline
+      default: "sarimax_initial_18months.pkl"
+  template:
+    apiVersion: serving.kserve.io/v1beta1
     metadata:
-      labels:
+      annotations: |
+        autoscaling.knative.dev/metric: concurrency
+        autoscaling.knative.dev/target: "1"
+        autoscaling.knative.dev/targetBurstCapacity: "0"
+      labels: |
         ai.sap.com/resourcePlan: infer.s
-    daemon: true
-    container:
-      image: docker.io/priyaannamalai/time-series-forecasting:latest
-      ports:
-        - containerPort: 5000
-          name: http
-      env:
-        - name: PORT
-          value: "5000"
-        - name: MODEL_DIR
-          value: "/app/models/"
-        - name: PYTHONUNBUFFERED
-          value: "1"
-      command: ["/bin/sh", "-c"]
-      args:
-        - |
-          echo "Starting Time Series Forecasting API Server"
-          echo "==========================================="
-          echo "Model directory: /app/models/"
-          echo "Port: 5000"
-          echo "==========================================="
-          echo ""
-          echo "Available models:"
-          ls -lh /app/models/ || echo "No models found yet"
-          echo ""
-          echo "Starting Flask API server..."
-          python /app/main.py
-      resources:
-        requests:
-          memory: "2Gi"
-          cpu: "1"
-        limits:
-          memory: "4Gi"
-          cpu: "2"
-      readinessProbe:
-        httpGet:
-          path: /health
-          port: 5000
-        initialDelaySeconds: 30
-        periodSeconds: 10
-        timeoutSeconds: 5
-      livenessProbe:
-        httpGet:
-          path: /health
-          port: 5000
-        initialDelaySeconds: 60
-        periodSeconds: 30
-        timeoutSeconds: 5
+    spec:
+      predictor:
+        imagePullSecrets:
+          - name: sarimaxpipelinesecret
+        minReplicas: 1
+        maxReplicas: 1
+        containers:
+          - name: kserve-container
+            image: docker.io/priyaannamalai/time-series-forecasting:latest
+            ports:
+              - containerPort: 5000
+                protocol: TCP
+            env:
+              - name: PORT
+                value: "5000"
+              - name: MODEL_DIR
+                value: "/app/models/"
+              - name: PYTHONUNBUFFERED
+                value: "1"
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                echo "Starting Time Series Forecasting API Server"
+                echo "==========================================="
+                echo "Model directory: /app/models/"
+                echo "Port: 5000"
+                echo "==========================================="
+                echo ""
+                echo "Available models:"
+                ls -lh /app/models/ || echo "No models found yet"
+                echo ""
+                echo "Starting Flask API server..."
+                python /app/main.py
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1"
+              limits:
+                memory: "4Gi"
+                cpu: "2"
