@@ -15,6 +15,8 @@ spec:
     parameters:
     - name: model-name
       default: "sarimax_initial_18months.pkl"
+      type: string
+      description: "Name of the trained SARIMAX model file to use for predictions"
   template:
     apiVersion: "serving.kserve.io/v1beta1"
     metadata:
@@ -27,40 +29,43 @@ spec:
     spec: |
       predictor:
         imagePullSecrets:
-        - name: sarimaxpipelinesecret
+          - name: sarimaxpipelinesecret
         minReplicas: 1
         maxReplicas: 1
         containers:
-        - name: kserve-container
-          image: docker.io/priyaannamalai/time-series-forecasting:latest
-          ports:
-          - containerPort: 5000
-            protocol: TCP
-          env:
-          - name: PORT
-            value: "5000"
-          - name: MODEL_DIR
-            value: "/app/models/"
-          - name: PYTHONUNBUFFERED
-            value: "1"
-          command: ["/bin/sh", "-c"]
-          args:
-          - |
-            echo "Starting Time Series Forecasting API Server"
-            echo "==========================================="
-            echo "Model directory: /app/models/"
-            echo "Port: 5000"
-            echo "==========================================="
-            echo ""
-            echo "Available models:"
-            ls -lh /app/models/ || echo "No models found yet"
-            echo ""
-            echo "Starting Flask API server..."
-            python /app/main.py
-          resources:
-            requests:
-              memory: "2Gi"
-              cpu: "1"
-            limits:
-              memory: "4Gi"
-              cpu: "2"
+          - name: kserve-container
+            image: docker.io/priyaannamalai/time-series-forecasting:latest
+            ports:
+              - containerPort: 5000
+                protocol: TCP
+            env:
+              - name: PORT
+                value: "5000"
+              - name: MODEL_DIR
+                value: "/app/models/"
+              - name: MODEL_NAME
+                value: "{{inputs.parameters.model-name}}"
+              - name: PYTHONUNBUFFERED
+                value: "1"
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                echo "Starting Time Series Forecasting API Server"
+                echo "==========================================="
+                echo "Model directory: /app/models/"
+                echo "Model name: $MODEL_NAME"
+                echo "Port: 5000"
+                echo "==========================================="
+                echo ""
+                echo "Available models:"
+                ls -lh /app/models/ || echo "No models found yet"
+                echo ""
+                echo "Starting Flask API server..."
+                python /app/main.py
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1"
+              limits:
+                memory: "4Gi"
+                cpu: "2"
