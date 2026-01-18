@@ -12,7 +12,7 @@ metadata:
     ai.sap.com/version: "1.0"
 spec:
   imagePullSecrets:
-    - name: sarimaxpipeline # Docker registry secret for priyaannamalai
+    - name: sarimaxpipelinesecret # Docker registry secret for priyaannamalai
   entrypoint: training-pipeline
   arguments:
     parameters:
