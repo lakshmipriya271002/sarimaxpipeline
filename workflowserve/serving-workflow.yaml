@@ -13,7 +13,7 @@ metadata:
     executables.ai.sap.com/category: "serving"
 spec:
   imagePullSecrets:
-    - name: sarimaxpipleinesecret # Docker registry secret (matches AI Core typo)
+    - name: sarimaxpipelinesecret # Docker registry secret for priyaannamalai
   entrypoint: serving-pipeline
   arguments:
     parameters:
