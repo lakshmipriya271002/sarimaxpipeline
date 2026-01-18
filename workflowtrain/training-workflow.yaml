@@ -64,10 +64,9 @@ spec:
           echo "==========================================="
           echo ""
           
-          # Note: Data file must be copied into the container image or mounted as a volume
-          # For now, using a placeholder - update with your actual data path
+          # Data file is included in the Docker image at /app/data/
           # Run the training pipeline
-          python /app/main.py train {{workflow.parameters.data-file}}
+          python /app/main.py train /app/data/{{workflow.parameters.data-file}}
           
           echo ""
           echo "==========================================="

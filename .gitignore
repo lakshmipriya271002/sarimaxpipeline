@@ -17,6 +17,9 @@ ENV/
 *.swo
 
 # Data files (optional - uncomment if you don't want to include data)
+# Note: Large data files excluded from git but included in Docker image
+data/*.csv
+data/*.xlsx
 # *.csv
 # *.xlsx
 
