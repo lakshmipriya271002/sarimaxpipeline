@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: timeseries-training-pipeline # executable id, must be unique across all your workflows
+  annotations:
+    scenarios.ai.sap.com/description: "Time series forecasting with SARIMAX - Three Pipeline Architecture"
+    scenarios.ai.sap.com/name: "Time Series Forecasting (SARIMAX)"
+    executables.ai.sap.com/description: "Trains SARIMAX model with expanding window and monthly retraining"
+    executables.ai.sap.com/name: "SARIMAX Training Pipeline"
+  labels:
+    scenarios.ai.sap.com/id: "time-series-forecasting"
+    ai.sap.com/version: "1.0"
+spec:
+  imagePullSecrets:
+    - name: sarimaxpipeline # Docker registry secret for priyaannamalai
+  entrypoint: training-pipeline
+  arguments:
+    parameters:
+    - name: data-file
+      value: "City_Gas_CNG_Combined.csv"
+    - name: start-date
+      value: "2023-04-01"
+    - name: end-date
+      value: "2025-03-31"
+    - name: train-window-months
+      value: "18"
+  
+  templates:
+  - name: training-pipeline
+    steps:
+    - - name: train-model
+        template: train-sarimax-model
+  
+  - name: train-sarimax-model
+    metadata:
+      labels:
+        ai.sap.com/resourcePlan: train.l # Use appropriate resource plan
+    outputs:
+      artifacts:
+      - name: models
+        path: /app/models
+        archive:
+          none: {}
+      - name: predictions
+        path: /app/outputs
+        archive:
+          none: {}
+    container:
+      image: docker.io/priyaannamalai/time-series-forecasting:latest # Docker image
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "Starting Time Series Training Pipeline"
+          echo "==========================================="
+          echo "Data file: {{workflow.parameters.data-file}}"
+          echo "Start date: {{workflow.parameters.start-date}}"
+          echo "End date: {{workflow.parameters.end-date}}"
+          echo "Training window: {{workflow.parameters.train-window-months}} months"
+          echo ""
+          echo "Pipeline Architecture:"
+          echo "1. Initial Training (18 months)"
+          echo "2. Daily Inference (expanding window)"
+          echo "3. Monthly Retraining"
+          echo "==========================================="
+          echo ""
+          
+          # Note: Data file must be copied into the container image or mounted as a volume
+          # For now, using a placeholder - update with your actual data path
+          # Run the training pipeline
+          python /app/main.py train {{workflow.parameters.data-file}}
+          
+          echo ""
+          echo "==========================================="
+          echo "Training completed successfully!"
+          echo "Models saved to: /app/models/"
+          echo "Predictions saved to: /app/outputs/"
+          echo "==========================================="
+          
+          # List generated files
+          echo ""
+          echo "Generated Models:"
+          ls -lh /app/models/
+          echo ""
+          echo "Generated Predictions:"
+          ls -lh /app/outputs/
+      env:
+      - name: TRAIN_WINDOW_MONTHS
+        value: "{{workflow.parameters.train-window-months}}"
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "2"
+        limits:
+          memory: "8Gi"
+          cpu: "4"

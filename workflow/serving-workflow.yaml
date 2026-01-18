@@ -1,0 +1,81 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: ServingTemplate
+metadata:
+  name: timeseries-serving-pipeline # executable id, must be unique
+  annotations:
+    scenarios.ai.sap.com/description: "Time series forecasting serving API with SARIMAX"
+    scenarios.ai.sap.com/name: "Time Series Forecasting API"
+    executables.ai.sap.com/description: "REST API for time series predictions using trained SARIMAX models"
+    executables.ai.sap.com/name: "SARIMAX Serving API"
+  labels:
+    scenarios.ai.sap.com/id: "time-series-forecasting"
+    ai.sap.com/version: "1.0"
+spec:
+  inputs:
+    parameters:
+      - name: model-name
+        default: "sarimax_initial_18months.pkl"
+      - name: port
+        default: "5000"
+  
+  template:
+    apiVersion: serving.kserve.io/v1beta1
+    kind: InferenceService
+    metadata:
+      name: timeseries-forecast-service
+      labels:
+        ai.sap.com/resourcePlan: infer.s
+    spec:
+      predictor:
+        minReplicas: 1
+        maxReplicas: 3
+        imagePullSecrets:
+          - name: sarimaxpipeline
+        containers:
+          - name: kserve-container
+            image: docker.io/priyaannamalai/time-series-forecasting:latest
+            ports:
+              - containerPort: 5000
+                protocol: TCP
+            env:
+              - name: PORT
+                value: "5000"
+              - name: MODEL_DIR
+                value: "/app/models/"
+              - name: PYTHONUNBUFFERED
+                value: "1"
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                echo "Starting Time Series Forecasting API Server"
+                echo "==========================================="
+                echo "Model directory: /app/models/"
+                echo "Port: 5000"
+                echo "==========================================="
+                echo ""
+                echo "Available models:"
+                ls -lh /app/models/ || echo "No models found yet"
+                echo ""
+                echo "Starting Flask API server..."
+                python /app/main.py
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1"
+              limits:
+                memory: "4Gi"
+                cpu: "2"
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 5000
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              timeoutSeconds: 5
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 5000
+              initialDelaySeconds: 60
+              periodSeconds: 30
+              timeoutSeconds: 5

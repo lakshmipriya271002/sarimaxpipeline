@@ -1,0 +1,64 @@
+# AI Core Deployment Configuration
+
+apiVersion: v1
+kind: ServingTemplate
+metadata:
+  name: time-series-forecasting
+  labels:
+    scenarios.ai.sap.com/id: "time-series"
+    ai.sap.com/version: "1.0.0"
+
+spec:
+  inputs:
+    artifacts:
+      - name: model
+        path: /app/models/
+    parameters:
+      - name: TRAIN_WINDOW_MONTHS
+        default: "18"
+      - name: FORECAST_HORIZON_DAYS
+        default: "1"
+      - name: PORT
+        default: "5000"
+  
+  template:
+    apiVersion: serving.kserve.io/v1beta1
+    kind: InferenceService
+    metadata:
+      name: time-series-forecasting
+      labels:
+        ai.sap.com/resourcePlan: "infer.s"
+    spec:
+      predictor:
+        minReplicas: 1
+        maxReplicas: 3
+        imagePullSecrets:
+          - name: registry-secret
+        containers:
+          - name: kserve-container
+            image: <your-registry>/time-series-forecasting:latest
+            ports:
+              - containerPort: 5000
+                protocol: TCP
+            env:
+              - name: PORT
+                value: "5000"
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1"
+              limits:
+                memory: "4Gi"
+                cpu: "2"
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 5000
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 5000
+              initialDelaySeconds: 60
+              periodSeconds: 30

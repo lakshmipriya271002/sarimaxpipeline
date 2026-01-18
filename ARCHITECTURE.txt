@@ -1,0 +1,336 @@
+================================================================================
+                    TIME SERIES FORECASTING PIPELINE
+                        AI CORE DEPLOYMENT
+================================================================================
+
+📁 DEPLOYMENT PACKAGE STRUCTURE
+================================================================================
+
+deployment/
+│
+├── 🐍 main.py                    [Core Application - 600+ lines]
+│   ├── Data Loading & Cleaning
+│   ├── SARIMAX Model Training
+│   ├── Three-Pipeline Architecture
+│   ├── Flask REST API
+│   └── Model Persistence
+│
+├── 📋 requirements.txt            [Python Dependencies]
+│   ├── pandas, numpy
+│   ├── scikit-learn
+│   ├── statsmodels (SARIMAX)
+│   └── flask (API)
+│
+├── 🐳 Dockerfile                  [Container Definition]
+│   ├── Python 3.10 base
+│   ├── Install dependencies
+│   ├── Expose port 5000
+│   └── Run Flask server
+│
+├── 🚀 deploy.sh                   [Automated Deployment]
+│   ├── Build Docker image
+│   ├── Tag for registry
+│   ├── Push to registry
+│   └── Optional local test
+│
+├── ⚙️  ai-core-config.yaml        [AI Core Configuration]
+│   ├── Resource allocation
+│   ├── Health checks
+│   ├── Scaling (1-3 replicas)
+│   └── Environment variables
+│
+├── 📖 README.md                   [Full Documentation]
+├── 🚦 QUICKSTART.md               [Quick Start Guide]
+├── 📊 SUMMARY.md                  [This Summary]
+└── 🙈 .gitignore                  [Git Ignore Rules]
+
+
+================================================================================
+📊 THREE-PIPELINE ARCHITECTURE
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        PIPELINE 1: INITIAL TRAINING                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Input: Historical Data (18 months)                                     │
+│  Process: Train SARIMAX model with exogenous variables                  │
+│  Output: Initial model → models/sarimax_initial_18months.pkl           │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     PIPELINE 2: DAILY INFERENCE                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│  For each day in forecast period:                                       │
+│    1. Use expanding window (includes all data up to yesterday)          │
+│    2. Retrain model with expanded data                                  │
+│    3. Predict next day                                                   │
+│    4. Store prediction                                                   │
+│  Process: 30 daily predictions (one month)                              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PIPELINE 3: MONTHLY RETRAINING                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│  After completing 1 month:                                              │
+│    1. Expand training window by 1 month                                 │
+│    2. Retrain model with 19 months of data                             │
+│    3. Save updated model → models/sarimax_month_N_19months.pkl         │
+│  Then return to Pipeline 2 for next month                              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+                            [Repeat for all months]
+
+
+================================================================================
+🔄 DATA FLOW
+================================================================================
+
+INPUT DATA (CSV)
+      ↓
+[Data Cleaning & Preprocessing]
+      ↓
+[Feature Engineering]
+      ├── Lagged features (1, 7, 14, 30 days)
+      ├── Temporal features (weekday, quarter, etc.)
+      └── Energy quality ratios
+      ↓
+[Daily Aggregation]
+      ↓
+[SARIMAX Training]
+      ├── Order: (1,1,1)
+      ├── Seasonal: (1,1,1,7) [weekly]
+      └── Exogenous variables
+      ↓
+[Daily Predictions with Expanding Window]
+      ↓
+[Aggregations]
+      ├── Daily
+      ├── Weekly
+      ├── Bi-weekly
+      └── Monthly
+      ↓
+OUTPUT FILES (CSV)
+      ├── predictions_daily.csv
+      ├── predictions_weekly.csv
+      ├── predictions_biweekly.csv
+      └── predictions_monthly.csv
+
+SAVED MODELS
+      ├── sarimax_initial_18months.pkl
+      ├── sarimax_month_1_19months.pkl
+      ├── sarimax_month_2_20months.pkl
+      └── ... [one per month]
+
+
+================================================================================
+🌐 API ENDPOINTS
+================================================================================
+
+REST API (Flask)
+http://localhost:5000
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET /health                                                              │
+│ → Health check endpoint                                                  │
+│ Returns: {"status": "healthy", "service": "time-series-forecasting"}    │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ POST /train                                                              │
+│ → Run complete training pipeline                                         │
+│ Input: {                                                                 │
+│   "data_file": "City_Gas_CNG_Combined.csv",                            │
+│   "start_date": "2023-04-01",                                           │
+│   "end_date": "2025-03-31"                                              │
+│ }                                                                        │
+│ Returns: {                                                               │
+│   "status": "success",                                                   │
+│   "total_predictions": 365,                                              │
+│   "metrics": {"mae": 123.45, "rmse": 234.56, "mape": 5.67},           │
+│   "output_dir": "./outputs/"                                            │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ POST /predict                                                            │
+│ → Get predictions from saved model                                       │
+│ Input: {                                                                 │
+│   "model_file": "sarimax_initial_18months.pkl",                        │
+│   "steps": 7,                                                            │
+│   "exog_data": [[...]]  // optional                                     │
+│ }                                                                        │
+│ Returns: {                                                               │
+│   "status": "success",                                                   │
+│   "predictions": [123.4, 125.6, 127.8, ...]                            │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET /models                                                              │
+│ → List all saved models                                                  │
+│ Returns: {                                                               │
+│   "status": "success",                                                   │
+│   "models": ["sarimax_initial_18months.pkl", ...],                     │
+│   "count": 5                                                             │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+🚀 DEPLOYMENT WORKFLOW
+================================================================================
+
+LOCAL TESTING
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. docker build -t time-series-forecasting:latest .                   │
+│ 2. docker run -p 5000:5000 time-series-forecasting:latest            │
+│ 3. curl http://localhost:5000/health                                   │
+└────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+PUSH TO REGISTRY
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. docker tag time-series-forecasting:latest \                        │
+│      <registry>/time-series-forecasting:latest                         │
+│ 2. docker push <registry>/time-series-forecasting:latest             │
+└────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+AI CORE DEPLOYMENT
+┌────────────────────────────────────────────────────────────────────────┐
+│ Option A: AI Core UI                                                   │
+│   → Upload ai-core-config.yaml                                         │
+│   → Configure parameters                                               │
+│   → Deploy                                                              │
+│                                                                         │
+│ Option B: AI Core SDK                                                  │
+│   → Use Python SDK to create deployment                               │
+│   → Monitor status                                                      │
+│                                                                         │
+│ Option C: Deploy Script                                                │
+│   → Run ./deploy.sh                                                    │
+│   → Follow prompts                                                      │
+└────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+PRODUCTION
+┌────────────────────────────────────────────────────────────────────────┐
+│ ✅ Service running on AI Core                                          │
+│ ✅ Health checks passing                                                │
+│ ✅ Auto-scaling (1-3 replicas)                                         │
+│ ✅ Ready for API calls                                                  │
+└────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+📈 PERFORMANCE METRICS
+================================================================================
+
+Model Evaluation Metrics (Automatically Calculated):
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ MAE  (Mean Absolute Error)                                              │
+│ → Average absolute difference between predicted and actual values       │
+│ → Lower is better                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RMSE (Root Mean Squared Error)                                          │
+│ → Square root of average squared differences                            │
+│ → Penalizes larger errors more heavily                                  │
+│ → Lower is better                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ MAPE (Mean Absolute Percentage Error)                                   │
+│ → Average percentage difference between predicted and actual            │
+│ → Expressed as percentage                                               │
+│ → Lower is better (< 10% is excellent)                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+🛠️ CUSTOMIZATION OPTIONS
+================================================================================
+
+In main.py, edit CONFIG dictionary:
+
+CONFIG = {
+    'TRAIN_WINDOW_MONTHS': 18,      # Change training window size
+    'FORECAST_HORIZON_DAYS': 1,     # Change forecast steps
+    'SARIMAX_ORDER': (1, 1, 1),     # Change ARIMA parameters
+    'SEASONAL_ORDER': (1, 1, 1, 7), # Change seasonality (7=weekly)
+    'OUTPUT_DIR': './outputs/',      # Change output location
+    'MODEL_DIR': './models/',        # Change model storage location
+}
+
+Advanced Customizations:
+• Modify data cleaning rules in load_and_prepare_data()
+• Add/remove exogenous variables in exog_var_names list
+• Adjust lag days: lag_days = [1, 7, 14, 30]
+• Change aggregation levels in aggregate_predictions()
+• Add custom API endpoints in Flask app
+
+
+================================================================================
+✅ CHECKLIST FOR DEPLOYMENT
+================================================================================
+
+PRE-DEPLOYMENT
+□ Review main.py configuration
+□ Test locally with Docker
+□ Verify data file format
+□ Check requirements.txt versions
+□ Update registry URL in deploy.sh
+
+DEPLOYMENT
+□ Build Docker image successfully
+□ Push to container registry
+□ Configure AI Core deployment
+□ Set environment variables
+□ Configure persistent storage
+
+POST-DEPLOYMENT
+□ Verify health endpoint
+□ Test training endpoint
+□ Test prediction endpoint
+□ Monitor resource usage
+□ Check logs for errors
+□ Validate predictions
+□ Set up alerts
+
+PRODUCTION
+□ Document API for users
+□ Set up monitoring
+□ Configure backups
+□ Plan for updates
+□ Security review
+
+
+================================================================================
+📞 QUICK REFERENCE
+================================================================================
+
+Start API Server:          python main.py
+Run Training:              python main.py train <data_file>
+Build Docker:              docker build -t time-series-forecasting .
+Run Docker:                docker run -p 5000:5000 time-series-forecasting
+Deploy to AI Core:         ./deploy.sh
+
+Health Check:              curl http://localhost:5000/health
+List Models:               curl http://localhost:5000/models
+
+Documentation:             README.md (full details)
+Quick Start:               QUICKSTART.md (step-by-step)
+This Summary:              SUMMARY.md (overview)
+
+
+================================================================================
+🎉 YOU'RE READY TO DEPLOY!
+================================================================================
+
+All files have been created in the /deployment folder.
+Follow QUICKSTART.md for step-by-step deployment instructions.
+
+Questions? Check README.md for comprehensive documentation.
+
+Good luck with your deployment! 🚀
+
+================================================================================
